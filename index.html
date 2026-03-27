@@ -4,19 +4,308 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sage — Your Personal Assistant</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; }
+    html, body { height: 100%; font-family: Georgia, 'Times New Roman', serif; background: #f5f0e8; }
     body {
-      font-family: Georgia, 'Times New Roman', serif;
-      background: #f5f0e8;
       background-image:
         radial-gradient(ellipse at 20% 20%, rgba(122,159,110,0.12) 0%, transparent 60%),
         radial-gradient(ellipse at 80% 80%, rgba(185,155,100,0.10) 0%, transparent 60%);
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes pulse { 0%
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity:.3; } 50% { opacity:1; } }
+
+    #key-modal { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:100; }
+    .modal-box { background:#fff; border-radius:20px; padding:36px 28px; max-width:400px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.2); text-align:center; }
+    .modal-box h2 { font-size:22px; color:#2d4a2d; margin-bottom:8px; }
+    .modal-box p { font-size:14px; color:#7a9070; margin-bottom:4px; }
+    #key-input { width:100%; border:1px solid rgba(122,159,110,0.4); border-radius:10px; padding:12px 14px; font-size:14px; font-family:monospace; margin:16px 0; color:#2d3a2d; display:block; }
+    #key-input:focus { outline:none; border-color:#7a9f6e; }
+    #key-btn { width:100%; background:#5a7a5a; color:#fff; border:none; border-radius:12px; padding:13px; font-size:15px; cursor:pointer; font-family:Georgia,serif; }
+    #key-btn:hover { background:#4a6a4a; }
+
+    #header { width:100%; max-width:680px; padding:24px 24px 18px; display:flex; align-items:center; gap:14px; border-bottom:1px solid rgba(122,159,110,0.2); }
+    .avatar { width:50px; height:50px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#7a9f6e,#a8c49a); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 4px 16px rgba(90,122,90,0.25); }
+    .avatar-sm { width:34px; height:34px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#7a9f6e,#a8c49a); display:flex; align-items:center; justify-content:center; font-size:16px; }
+    #header h1 { font-size:21px; color:#2d4a2d; letter-spacing:-0.3px; }
+    #header p { font-size:13px; color:#7a9070; font-style:italic; }
+    .status { margin-left:auto; display:flex; align-items:center; gap:6px; }
+    .dot-green { width:8px; height:8px; border-radius:50%; background:#7ac070; }
+    .status span { font-size:12px; color:#7a9070; }
+
+    #chat { width:100%; max-width:680px; padding:24px 20px 130px; display:flex; flex-direction:column; gap:18px; flex:1; }
+    #welcome { text-align:center; margin-top:32px; }
+    #welcome .big-leaf { font-size:40px; margin-bottom:12px; }
+    #welcome h2 { font-size:20px; color:#2d4a2d; font-weight:600; margin-bottom:8px; }
+    #welcome .sub { font-size:15px; color:#7a9070; font-style:italic; margin-bottom:28px; }
+    #starters { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+    .chip { background:rgba(122,159,110,0.12); border:1px solid rgba(122,159,110,0.3); border-radius:20px; padding:8px 16px; font-size:13px; color:#4a6a4a; cursor:pointer; font-family:inherit; transition:background 0.15s; }
+    .chip:hover { background:rgba(122,159,110,0.22); }
+
+    .msg-row { display:flex; gap:10px; align-items:flex-start; animation:fadeUp 0.3s ease forwards; }
+    .msg-row.user { flex-direction:row-reverse; }
+    .bubble { max-width:76%; padding:13px 17px; font-size:15px; line-height:1.6; word-break:break-word; }
+    .bubble.assistant { background:#fff; color:#2d3a2d; border-radius:18px 18px 18px 4px; border:1px solid rgba(122,159,110,0.15); box-shadow:0 2px 12px rgba(0,0,0,0.07); }
+    .bubble.user { background:linear-gradient(135deg,#5a7a5a,#4a6a4a); color:#f5f0e8; border-radius:18px 18px 4px 18px; box-shadow:0 3px 12px rgba(74,106,74,0.3); }
+
+    .typing-bubble { background:#fff; border-radius:18px 18px 18px 4px; padding:16px 20px; display:flex; gap:5px; align-items:center; border:1px solid rgba(122,159,110,0.15); box-shadow:0 2px 12px rgba(0,0,0,0.07); }
+    .td { width:8px; height:8px; border-radius:50%; background:#7a9f6e; display:inline-block; animation:pulse 1.4s ease-in-out infinite; }
+    .td:nth-child(2) { animation-delay:0.2s; }
+    .td:nth-child(3) { animation-delay:0.4s; }
+
+    #error-box { display:none; background:#fff3f0; border:1px solid #f0b8b0; border-radius:12px; padding:12px 16px; font-size:14px; color:#a04040; text-align:center; }
+
+    #input-bar { position:fixed; bottom:0; left:0; right:0; display:flex; justify-content:center; padding:12px 20px 20px; background:linear-gradient(to top, #f5f0e8 70%, transparent); }
+    #input-wrap { width:100%; max-width:680px; display:flex; gap:10px; align-items:flex-end; background:#fff; border-radius:24px; padding:10px 10px 10px 18px; box-shadow:0 4px 24px rgba(0,0,0,0.12); border:1px solid rgba(122,159,110,0.2); }
+    #msg-input { flex:1; border:none; resize:none; background:transparent; font-size:15px; color:#2d3a2d; line-height:1.5; font-family:inherit; padding-top:4px; max-height:140px; overflow-y:auto; }
+    #msg-input:focus { outline:none; }
+    #send-btn { width:40px; height:40px; border-radius:50%; border:none; background:#c8dbc0; color:#fff; cursor:default; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
+    #send-btn.active { background:#5a7a5a; cursor:pointer; }
+    #send-btn.active:hover { background:#4a6a4a; transform:translateY(-1px); }
+    .spinner-icon { width:18px; height:18px; border:2px solid #c8dbc0; border-top-color:#5a7a5a; border-radius:50%; animation:spin 0.8s linear infinite; }
+    #hint { text-align:center; font-size:11px; color:#aab8a0; margin-top:6px; }
+  </style>
+</head>
+<body>
+
+<div id="key-modal">
+  <div class="modal-box">
+    <div style="font-size:42px;margin-bottom:12px">🌿</div>
+    <h2>Welcome to Sage</h2>
+    <p>Enter your Anthropic API key to wake her up.</p>
+    <small style="font-size:12px;color:#aab8a0">Your key is saved on this device only.</small>
+    <input id="key-input" type="password" placeholder="sk-ant-..." autocomplete="off"/>
+    <button id="key-btn">Wake up Sage 🌿</button>
+    <div style="font-size:11px;color:#c0c8b8;margin-top:12px">Get your key at console.anthropic.com</div>
+  </div>
+</div>
+
+<div id="header">
+  <div class="avatar">🌿</div>
+  <div>
+    <h1>Sage</h1>
+    <p>Your personal everything assistant</p>
+  </div>
+  <div class="status">
+    <div class="dot-green"></div>
+    <span>Ready</span>
+  </div>
+</div>
+
+<div id="chat">
+  <div id="welcome">
+    <div class="big-leaf">🌿</div>
+    <h2>Good morning, Shawn.</h2>
+    <p class="sub">What are we building today?</p>
+    <div id="starters">
+      <button class="chip">Where am I in my 90-day plan?</button>
+      <button class="chip">Help me write my chatbot script</button>
+      <button class="chip">Give me a garden tip for March</button>
+      <button class="chip">What should I focus on today?</button>
+    </div>
+  </div>
+  <div id="typing-row" class="msg-row" style="display:none">
+    <div class="avatar-sm">🌿</div>
+    <div class="typing-bubble">
+      <div class="td"></div><div class="td"></div><div class="td"></div>
+    </div>
+  </div>
+  <div id="error-box"></div>
+  <div id="bottom"></div>
+</div>
+
+<div id="input-bar">
+  <div style="width:100%;max-width:680px">
+    <div id="input-wrap">
+      <textarea id="msg-input" rows="1" placeholder="Ask Sage anything…"></textarea>
+      <button id="send-btn">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M2 9 L16 9 M10 3 L16 9 L10 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div id="hint">Sage knows you. Just talk.</div>
+  </div>
+</div>
+
+<script>
+const SYSTEM = `You are Sage — a warm, wise, and deeply personal AI assistant built exclusively for Shawn (pen name S.T. Belmont), a Wisconsin-based author, entrepreneur, and intentional living advocate.
+
+Who Shawn Is:
+- Published author: Nyla's Piggy Bank, Nyla's Day at the Zoo, and How to Start Homeschooling 101
+- ~15 years retail & store management at Walmart
+- ~5 years as a nanny with homeschooling experience
+- Licensed real estate agent in Wisconsin
+- Active gardener, bread maker, jam maker, scratch cook — calls herself a "fake herbalist"
+- Building AI-powered income streams full-time; flagship project is a financial planning chatbot
+- Has a 90-day action plan for her chatbot build
+- Completed Anthropic's AI Fluency course; prior ChatGPT background
+
+Shawn's Philosophy — Health and Wealth:
+- Health: brain health, physical wellness, natural living, intentional food choices
+- Wealth: residual income, financial independence, AI-powered tools, real estate
+
+Your Role:
+- Help Shawn build her chatbot business and income streams
+- Keep her on track with her 90-day plan and goals
+- Brainstorm, strategize, problem-solve
+- Support writing, homeschooling, health, and wellness decisions
+- Be her Jarvis — her personal everything assistant
+
+Your Tone:
+- Warm, encouraging, genuinely invested in her success
+- Practical and no-nonsense — no fluff or filler
+- Educational and informative
+- Conversational and fun — like a brilliant best friend
+- Celebrate her wins; push her when she needs it
+
+Rules:
+- Know Shawn personally. Reference her context naturally.
+- Never open with Certainly! or hollow phrases.
+- Match response length to the question.
+- You are exclusively for Shawn.`;
+
+let messages = [];
+let loading = false;
+let apiKey = localStorage.getItem("sage_key") || "";
+
+const modal = document.getElementById("key-modal");
+const keyInput = document.getElementById("key-input");
+const keyBtn = document.getElementById("key-btn");
+const msgInput = document.getElementById("msg-input");
+const sendBtn = document.getElementById("send-btn");
+const chat = document.getElementById("chat");
+const typingRow = document.getElementById("typing-row");
+const errorBox = document.getElementById("error-box");
+const bottom = document.getElementById("bottom");
+
+function init() {
+  modal.style.display = apiKey ? "none" : "flex";
+}
+
+keyBtn.addEventListener("click", () => {
+  const val = keyInput.value.trim();
+  if (!val) return;
+  localStorage.setItem("sage_key", val);
+  apiKey = val;
+  modal.style.display = "none";
+});
+
+keyInput.addEventListener("keydown", e => { if (e.key === "Enter") keyBtn.click(); });
+
+document.querySelectorAll(".chip").forEach(btn => {
+  btn.addEventListener("click", () => send(btn.textContent));
+});
+
+msgInput.addEventListener("input", () => {
+  msgInput.style.height = "auto";
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 140) + "px";
+  sendBtn.classList.toggle("active", !!msgInput.value.trim() && !loading);
+});
+
+msgInput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+sendBtn.addEventListener("click", () => send());
+
+function scrollDown() { bottom.scrollIntoView({ behavior: "smooth" }); }
+
+function addBubble(role, text) {
+  const welcome = document.getElementById("welcome");
+  if (welcome) welcome.remove();
+
+  const row = document.createElement("div");
+  row.className = "msg-row " + role;
+
+  if (role === "assistant") {
+    const av = document.createElement("div");
+    av.className = "avatar-sm";
+    av.textContent = "🌿";
+    row.appendChild(av);
+  }
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble " + role;
+  bubble.innerHTML = text
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    .replace(/\n/g,"<br>");
+  row.appendChild(bubble);
+
+  chat.insertBefore(row, typingRow);
+  scrollDown();
+}
+
+function setTyping(show) {
+  typingRow.style.display = show ? "flex" : "none";
+  if (show) scrollDown();
+}
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.style.display = msg ? "block" : "none";
+}
+
+function setSendBtn(spinning) {
+  sendBtn.innerHTML = spinning
+    ? '<div class="spinner-icon"></div>'
+    : '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9 L16 9 M10 3 L16 9 L10 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+async function send(text) {
+  const msg = (text || msgInput.value).trim();
+  if (!msg || loading) return;
+
+  loading = true;
+  msgInput.value = "";
+  msgInput.style.height = "auto";
+  sendBtn.classList.remove("active");
+  setSendBtn(true);
+  showError("");
+
+  messages.push({ role: "user", content: msg });
+  addBubble("user", msg);
+  setTyping(true);
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: SYSTEM,
+        messages: messages
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const reply = (data.content || []).map(b => b.text || "").join("\n") || "Something went quiet. Try again?";
+    messages.push({ role: "assistant", content: reply });
+    setTyping(false);
+    addBubble("assistant", reply);
+
+  } catch (err) {
+    setTyping(false);
+    messages.pop();
+    showError("Couldn't reach Sage. Check your API key and try again.");
+  } finally {
+    loading = false;
+    setSendBtn(false);
+    sendBtn.classList.toggle("active", !!msgInput.value.trim());
+  }
+}
+
+init();
+</script>
+</body>
+</html>
