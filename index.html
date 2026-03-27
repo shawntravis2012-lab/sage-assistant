@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sage — Your Personal Assistant</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      background: #f5f0e8;
+      background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(122,159,110,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(185,155,100,0.10) 0%, transparent 60%);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
+    .msg-bubble { animation: fadeUp 0.35s ease forwards; }
+    .dot { animation: pulse 1.4s ease-in-out infinite; display:inline-block; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    .send-btn { transition: all 0.15s ease; }
+    .send-btn:hover:not(:disabled) { background: #4a6a4a !important; transform: translateY(-1px); }
+    .chip:hover { background: rgba(122,159,110,0.22) !important; }
+    textarea:focus { outline: none; }
+    .spinner {
+      width:18px; height:18px; border:2px solid #c8dbc0;
+      border-top-color:#5a7a5a; border-radius:50%;
+      animation: spin 0.8s linear infinite; display:inline-block;
+    }
+    /* Key modal */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.4);
+      display:flex; align-items:center; justify-content:center; z-index:100;
+    }
+    .modal-box {
+      background:#fff; border-radius:20px; padding:32px 28px;
+      max-width:420px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.2);
+      text-align:center;
+    }
+    .key-input {
+      width:100%; border:1px solid rgba(122,159,110,0.4); border-radius:10px;
+      padding:12px 14px; font-size:14px; font-family:monospace;
+      margin:16px 0; color:#2d3a2d;
+    }
+    .key-input:focus { outline:none; border-color:#7a9f6e; }
+    .key-btn {
+      background:#5a7a5a; color:#fff; border:none; border-radius:12px;
+      padding:12px 28px; font-size:15px; cursor:pointer;
+      font-family:Georgia,serif; width:100%;
+    }
+    .key-btn:hover { background:#4a6a4a; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const SYSTEM_PROMPT = `You are Sage — a warm, wise, and deeply personal AI assistant built exclusively for Shawn (pen name S.T. Belmont), a Wisconsin-based author, entrepreneur, and intentional living advocate.
+
+## Who Shawn Is
+- Published author: children's series Nyla's Piggy Bank and Nyla's Day at the Zoo, plus How to Start Homeschooling 101
+- ~15 years retail & store management experience at Walmart
+- ~5 years as a nanny with homeschooling experience
+- Licensed real estate agent in Wisconsin
+- Active gardener, bread maker, jam maker, scratch cook — calls herself a "fake herbalist" with warmth and humor
+- Currently building AI-powered income streams, with a flagship financial planning chatbot as her primary project
+- Has a detailed 90-day action plan and build blueprint for her chatbot
+- Learning Claude through Anthropic's free course; prior experience with ChatGPT
+
+## Shawn's Core Philosophy: "Health & Wealth"
+Everything connects to this framework:
+- Health: brain health, physical wellness (inside and out), natural living, intentional food choices
+- Wealth: residual income, financial independence, productized services, AI-powered tools, real estate
+
+## Your Role as Sage
+You are Shawn's all-in-one personal assistant. You help her:
+- Build her AI-powered chatbot business and income streams
+- Stay on track with goals and her 90-day plan
+- Brainstorm, strategize, and problem-solve
+- Navigate homeschooling, writing, and content creation
+- Make decisions around health, wellness, food, and natural living
+- Stay motivated, grounded, and aligned with her vision
+
+## Your Tone
+- Warm, encouraging, and genuinely invested in Shawn's success
+- Practical and no-nonsense — you don't pad or fluff
+- Educational and informative — you explain things clearly
+- Conversational and fun — you feel like a brilliant best friend, not a corporate bot
+- You may use light humor when appropriate
+- You celebrate her wins, no matter how small
+- You're direct when she needs a push
+
+## Important
+- You know Shawn personally. Reference her context naturally, not robotically.
+- Never start responses with "Certainly!" or hollow filler phrases.
+- Keep responses appropriately sized: short for simple questions, thorough for complex ones.
+- You are exclusively for Shawn. You are her Sage.`;
+
+const STARTERS = [
+  "Where am I in my 90-day plan?",
+  "Help me write my chatbot script",
+  "Give me a garden tip for March",
+  "What should I focus on today?"
+];
+
+function KeyModal({ onSave }) {
+  const [val, setVal] = React.useState("");
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <div style={{fontSize:40,marginBottom:12}}>🌿</div>
+        <div style={{fontSize:22,fontWeight:700,color:"#2d4a2d",marginBottom:8}}>Welcome to Sage</div>
+        <div style={{fontSize:14,color:"#7a9070",marginBottom:4}}>
+          Enter your Anthropic API key to wake her up.
+        </div>
+        <div style={{fontSize:12,color:"#aab8a0",marginBottom:4}}>
+          Your key stays on your device only.
+        </div>
+        <input
+          className="key-input"
+          type="password"
+          placeholder="sk-ant-..."
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && val.startsWith("sk-") && onSave(val)}
+        />
+        <button className="key-btn" onClick={() => onSave(val)} disabled={!val.startsWith("sk-")}>
+          Wake up Sage 🌿
+        </button>
+        <div style={{fontSize:11,color:"#c0c8b8",marginTop:12}}>
+          Get your key at console.anthropic.com
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [apiKey, setApiKey] = React.useState(() => sessionStorage.getItem("sage_key") || "");
+  const [messages, setMessages] = React.useState([]);
+  const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const bottomRef = React.useRef(null);
+  const textareaRef = React.useRef(null);
+
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const saveKey = (key) => {
+    sessionStorage.setItem("sage_key", key);
+    setApiKey(key);
+  };
+
+  const autoResize = () => {
+    const el = textareaRef.current;
+    if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }
+  };
+
+  const sendMessage = async (text) => {
+    const msg = (text || input).trim();
+    if (!msg || loading) return;
+    const newMessages = [...messages, { role: "user", content: msg }];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
+    setError(null);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: SYSTEM_PROMPT, messages: newMessages }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+      const reply = data.content?.map(b => b.text || "").join("\n") || "Something went quiet. Try again?";
+      setMessages([...newMessages, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setError("Couldn't reach Sage. Check your API key or connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  };
+
+  const fmt = (text) => text.split("\n").map((line, i, arr) => {
+    const parts = line.split(/(\*\*[^*]+\*\*)/g).map((p, j) =>
+      p.startsWith("**") ? React.createElement("strong", {key:j}, p.slice(2,-2)) : p
+    );
+    return React.createElement(React.Fragment, {key:i}, ...parts, i < arr.length-1 ? React.createElement("br") : null);
+  });
+
+  if (!apiKey) return React.createElement(KeyModal, { onSave: saveKey });
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",padding:"0 0 20px"}}>
+      {/* Header */}
+      <div style={{width:"100%",maxWidth:680,padding:"28px 24px 20px",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid rgba(122,159,110,0.2)"}}>
+        <div style={{width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#7a9f6e,#a8c49a)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 16px rgba(90,122,90,0.25)",fontSize:24}}>🌿</div>
+        <div>
+          <div style={{fontSize:22,fontWeight:700,color:"#2d4a2d",letterSpacing:"-0.3px"}}>Sage</div>
+          <div style={{fontSize:13,color:"#7a9070",fontStyle:"italic"}}>Your personal everything assistant</div>
+        </div>
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:"#7ac070"}}/>
+          <span style={{fontSize:12,color:"#7a9070"}}>Ready</span>
+        </div>
+      </div>
+
+      {/* Chat */}
+      <div style={{width:"100%",maxWidth:680,flex:1,padding:"24px 20px",display:"flex",flexDirection:"column",gap:18}}>
+        {messages.length === 0 && (
+          <div style={{textAlign:"center",marginTop:40}}>
+            <div style={{fontSize:38,marginBottom:12}}>🌿</div>
+            <div style={{fontSize:20,color:"#2d4a2d",fontWeight:600,marginBottom:8}}>Good morning, Shawn.</div>
+            <div style={{fontSize:15,color:"#7a9070",marginBottom:28,fontStyle:"italic"}}>What are we building today?</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:10,justifyContent:"center"}}>
+              {STARTERS.map(p => (
+                <button key={p} className="chip" onClick={() => sendMessage(p)}
+                  style={{background:"rgba(122,159,110,0.12)",border:"1px solid rgba(122,159,110,0.3)",borderRadius:20,padding:"8px 16px",fontSize:13,color:"#4a6a4a",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div key={i} className="msg-bubble" style={{display:"flex",flexDirection:msg.role==="user"?"row-reverse":"row",gap:10,alignItems:"flex-start"}}>
+            {msg.role === "assistant" && (
+              <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#7a9f6e,#a8c49a)",display:"flex",alignItems:"center",justifyContent:"center",marginTop:2,fontSize:16}}>🌿</div>
+            )}
+            <div style={{maxWidth:"76%",background:msg.role==="user"?"linear-gradient(135deg,#5a7a5a,#4a6a4a)":"#fff",color:msg.role==="user"?"#f5f0e8":"#2d3a2d",borderRadius:msg.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"13px 17px",fontSize:15,lineHeight:1.6,boxShadow:msg.role==="user"?"0 3px 12px rgba(74,106,74,0.3)":"0 2px 12px rgba(0,0,0,0.07)",border:msg.role==="assistant"?"1px solid rgba(122,159,110,0.15)":"none"}}>
+              {fmt(msg.content)}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#7a9f6e,#a8c49a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🌿</div>
+            <div style={{background:"#fff",borderRadius:"18px 18px 18px 4px",padding:"16px 20px",display:"flex",gap:5,alignItems:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.07)",border:"1px solid rgba(122,159,110,0.15)"}}>
+              <div className="dot" style={{width:8,height:8,borderRadius:"50%",background:"#7a9f6e"}}/>
+              <div className="dot" style={{width:8,height:8,borderRadius:"50%",background:"#7a9f6e"}}/>
+              <div className="dot" style={{width:8,height:8,borderRadius:"50%",background:"#7a9f6e"}}/>
+            </div>
+          </div>
+        )}
+
+        {error && <div style={{background:"#fff3f0",border:"1px solid #f0b8b0",borderRadius:12,padding:"12px 16px",fontSize:14,color:"#a04040",textAlign:"center"}}>{error}</div>}
+        <div ref={bottomRef}/>
+      </div>
+
+      {/* Input */}
+      <div style={{width:"100%",maxWidth:680,padding:"0 20px",position:"sticky",bottom:20}}>
+        <div style={{display:"flex",gap:10,alignItems:"flex-end",background:"#fff",borderRadius:24,padding:"10px 10px 10px 18px",boxShadow:"0 4px 24px rgba(0,0,0,0.12)",border:"1px solid rgba(122,159,110,0.2)"}}>
+          <textarea ref={textareaRef} value={input} onChange={e=>{setInput(e.target.value);autoResize();}} onKeyDown={handleKey}
+            placeholder="Ask Sage anything…" rows={1}
+            style={{flex:1,border:"none",resize:"none",background:"transparent",fontSize:15,color:"#2d3a2d",lineHeight:1.5,fontFamily:"inherit",paddingTop:4,maxHeight:140,overflowY:"auto"}}/>
+          <button className="send-btn" onClick={()=>sendMessage()} disabled={!input.trim()||loading}
+            style={{width:40,height:40,borderRadius:"50%",border:"none",background:input.trim()&&!loading?"#5a7a5a":"#c8dbc0",color:"#fff",cursor:input.trim()&&!loading?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {loading
+              ? React.createElement("div", {className:"spinner"})
+              : React.createElement("svg",{width:18,height:18,viewBox:"0 0 18 18",fill:"none"},
+                  React.createElement("path",{d:"M2 9 L16 9 M10 3 L16 9 L10 15",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"})
+                )
+            }
+          </button>
+        </div>
+        <div style={{textAlign:"center",fontSize:11,color:"#aab8a0",marginTop:8}}>Sage knows you. Just talk.</div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
